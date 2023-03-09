@@ -1,3 +1,4 @@
+import threading
 import requests
 from bs4 import BeautifulSoup
 import logging
@@ -29,27 +30,36 @@ def get_links(url):
             if href and href.startswith('/wiki/') and not href.startswith('/wiki/Special:'):
                 links.append('https://ru.wikipedia.org' + href)
         return links
-    except Exception as e:
+    except requests.exceptions.RequestException as e:
         logger.error(f"Error getting links from {url}: {str(e)}")
         return []
+
+
+def process_page(queue, visited_pages, current_page, end_url):
+    logger.debug(f"Visiting page {current_page}")
+    if current_page == end_url:
+        return current_page
+    elif current_page not in visited_pages:
+        visited_pages.add(current_page)
+        for link in get_links(current_page):
+            queue.append(link)
+    return None
 
 
 def find_path(start_url, end_url):
     """Поиск пути между двумя страницами"""
     visited_pages = set()
-    queue = [[start_url]]
+    queue = [start_url]
+    threads = []
     while queue:
-        path = queue.pop(0)
-        current_page = path[-1]
-        logger.debug(f"Visiting page {current_page}")
+        current_page = queue.pop(0)
         if current_page == end_url:
-            return path
-        elif current_page not in visited_pages:
-            visited_pages.add(current_page)
-            for link in get_links(current_page):
-                new_path = list(path)
-                new_path.append(link)
-                queue.append(new_path)
+            return [current_page]
+        threads = [t for t in threads if t.is_alive()]
+        if len(threads) < 25:
+            t = threading.Thread(target=process_page, args=(queue, visited_pages, current_page, end_url))
+            t.start()
+            threads.append(t)
     logger.warning("Path not found")
     return []
 
@@ -64,7 +74,7 @@ def find_paragraph(start_url, end_url):
             if end_url in str(p):
                 return p.text.strip()
         return "Url not found"
-    except Exception as e:
+    except requests.exceptions.RequestException as e:
         logger.error(f"Error getting page {start_url}: {str(e)}")
         return "Error. Url not found"
 
