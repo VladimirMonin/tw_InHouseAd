@@ -1,7 +1,8 @@
-import threading
 import requests
 from bs4 import BeautifulSoup
 import logging
+import queue
+import threading
 
 # Создание логгера
 logger = logging.getLogger(__name__)
@@ -35,31 +36,31 @@ def get_links(url):
         return []
 
 
-def process_page(queue, visited_pages, current_page, end_url):
-    logger.debug(f"Visiting page {current_page}")
-    if current_page not in visited_pages:
-        visited_pages.add(current_page)
-        for link in get_links(current_page):
-            if link == end_url:
-                return [current_page, link]
-            if link not in visited_pages:
-                queue.append(link)
-    return None
+def process_page(queue, visited_pages, end_url):
+    while True:
+        current_page = queue.get()
+        if current_page == end_url:
+            queue.task_done()
+            return current_page
+        elif current_page not in visited_pages:
+            visited_pages.add(current_page)
+            for link in get_links(current_page):
+                queue.put(link)
+        queue.task_done()
+
 
 def find_path(start_url, end_url):
     """Поиск пути между двумя страницами"""
     visited_pages = set()
-    queue = [start_url]
+    queue_pages = queue.Queue()
+    queue_pages.put(start_url)
+    num_threads = 25
     threads = []
-    while queue:
-        current_page = queue.pop(0)
-        if current_page == end_url:
-            return [current_page]
-        threads = [t for t in threads if t.is_alive()]
-        if len(threads) < 25:
-            t = threading.Thread(target=process_page, args=(queue, visited_pages, current_page, end_url))
-            t.start()
-            threads.append(t)
+    for i in range(num_threads):
+        t = threading.Thread(target=process_page, args=(queue_pages, visited_pages, end_url))
+        t.start()
+        threads.append(t)
+    queue_pages.join()
     logger.warning("Path not found")
     return []
 
