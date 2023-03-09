@@ -54,6 +54,21 @@ def find_path(start_url, end_url):
     return []
 
 
+def find_paragraph(start_url, end_url):
+    """Поиск первого абзаца текста на странице start_url, в котором встречается ссылка на страницу end_url"""
+    end_url = end_url.replace('https://ru.wikipedia.org', '')
+    try:
+        response = requests.get(start_url)
+        soup = BeautifulSoup(response.content, 'html.parser')
+        for p in soup.find_all('p'):
+            if end_url in str(p):
+                return p.text.strip()
+        return "Url not found"
+    except Exception as e:
+        logger.error(f"Error getting page {start_url}: {str(e)}")
+        return "Error. Url not found"
+
+
 def main():
     start_url = input("Введите ссылку на стартовую страницу: ")
     end_url = input("Введите ссылку на конечную страницу: ")
@@ -70,18 +85,11 @@ def main():
     for i, page in enumerate(path):
         print(f"{i + 1}------------------------")
         try:
-            response = requests.get(page)
-            soup = BeautifulSoup(response.content, 'html.parser')
-            for p in soup.find_all('p'):
-                if page in str(p):
-                    print(p.text.strip())
-                    for link in get_links(page):
-                        if link in str(p):
-                            print(f"Ссылка: {link}")
-                    if i < len(path) - 1:
-                        print(f"Следующая страница: {path[i + 1]}\n")
-                    else:
-                        print()
+            paragraph = find_paragraph(page, end_url)
+            if not paragraph:
+                print(f"Абзац с ссылкой на {end_url} не найден")
+            else:
+                print(paragraph)
+                print(f"Ссылка на {end_url}: {page}\n")
         except requests.exceptions.RequestException as e:
             logger.error(f"Error getting page {page}: {str(e)}")
-
