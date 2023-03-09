@@ -37,14 +37,14 @@ def get_links(url):
 
 def process_page(queue, visited_pages, current_page, end_url):
     logger.debug(f"Visiting page {current_page}")
-    if current_page == end_url:
-        return current_page
-    elif current_page not in visited_pages:
+    if current_page not in visited_pages:
         visited_pages.add(current_page)
         for link in get_links(current_page):
-            queue.append(link)
+            if link == end_url:
+                return [current_page, link]
+            if link not in visited_pages:
+                queue.append(link)
     return None
-
 
 def find_path(start_url, end_url):
     """Поиск пути между двумя страницами"""
