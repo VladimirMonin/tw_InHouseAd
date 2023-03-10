@@ -1,9 +1,8 @@
 import asyncio
 import re
-
-from lxml import html
+import requests
+from bs4 import BeautifulSoup
 import aiohttp
-import multiprocessing
 import datetime
 import logging
 
@@ -47,8 +46,8 @@ def extend_path(path, link):
 
 async def bfs(start, end):
     """Поиск в ширину от start до end на википедии"""
-    queue = [[start]] # создаем очередь путей, начинаем с пути из стартовой страницы
-    visited = set() # создаем множество посещенных страниц
+    queue = [[start]]  # создаем очередь путей, начинаем с пути из стартовой страницы
+    visited = set()  # создаем множество посещенных страниц
 
     while queue:
         path = queue.pop(0)  # извлекаем первый путь из очереди
@@ -71,16 +70,37 @@ async def bfs(start, end):
     return None  # если путь не найден, возвращаем None
 
 
+def print_paragraph_with_link(path):
+    """Вывод на экран результатов работы. Ищет абзац текста в котором есть ссылка на следующую страницу"""
+    print(f'Полный путь: {path}\n\n')
+    for idx, link in enumerate(path):
+        next_idx = (idx + 1) % len(path)  # индекс следующей ссылки
+        next_link = path[next_idx]  # следующая ссылка
+        response = requests.get(link)
+        soup = BeautifulSoup(response.text, 'html.parser')
+        paragraphs = soup.find_all('p')
+        for p in paragraphs:
+            if next_link.replace('https://ru.wikipedia.org', '') in str(p):
+                print(f'{idx + 1}) Ссылка:\n{link}\nНайдена в тексте:\n{p.text.strip()}'
+                      f'\n__________________________________________________\n')
+                break
+        else:
+            print(f'{idx + 1}) Текст не найден. Вероятно это последняя ссылка в пути:\n{link}'
+                  f'\n__________________________________________________\n')
+
+
 async def main():
     start = "https://ru.wikipedia.org/wiki/Xbox_360_S"
-    end = "https://ru.wikipedia.org/wiki/Nintendo_3DS"
+    end = "https://ru.wikipedia.org/wiki/Kinect"
 
-    starttime = datetime.datetime.now()
     print(f'Запущено в {datetime.datetime.now().strftime("%H:%M:%S")}')
     loop = asyncio.get_running_loop()
     path = await bfs(start, end)
-    print(path)
+    print_paragraph_with_link(path)
     print(f'Завершено в {datetime.datetime.now().strftime("%H:%M:%S")}')
-    print(f'Потрачено минут на обработку: {(datetime.datetime.now() - starttime) // 60}')
 
-asyncio.run(main())
+
+if __name__ == '__main__':
+    asyncio.run(main())
+
+
