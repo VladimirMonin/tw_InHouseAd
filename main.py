@@ -45,50 +45,42 @@ def extend_path(path, link):
     return path + [link]
 
 
-def bfs(start, end):
+async def bfs(start, end):
     """Поиск в ширину от start до end на википедии"""
-    queue = [[start]]  # создаем очередь путей, начинаем с пути из стартовой страницы
-    visited = set()  # создаем множество посещенных страниц
-    lock = multiprocessing.Lock()  # создаем блокировку для безопасности многопоточности
-
-    pool = multiprocessing.Pool()  # создаем пул процессов
+    queue = [[start]] # создаем очередь путей, начинаем с пути из стартовой страницы
+    visited = set() # создаем множество посещенных страниц
 
     while queue:
         path = queue.pop(0)  # извлекаем первый путь из очереди
         node = path[-1]  # получаем последнюю страницу в пути
 
         if node == end:
-            pool.close()  # закрываем пул процессов
-            pool.join()  # ждем завершения всех процессов
             return path  # возвращаем найденный путь
 
         elif node not in visited:  # если страница не была посещена
-            with lock:
-                visited.add(node)  # добавляем страницу в посещенные
+            visited.add(node)  # добавляем страницу в посещенные
 
-            links = asyncio.run(get_links_async(node))  # получаем список ссылок со страницы
-            new_paths = pool.starmap(extend_path,
-                                     [(path, link) for link in links])  # расширяем текущие пути новыми ссылками
+            links = await asyncio.create_task(get_links_async(node))  # получаем список ссылок со страницы
+            new_paths = [extend_path(path, link) for link in links]  # расширяем текущие пути новыми ссылками
 
             queue.extend(new_paths)  # добавляем расширенные пути в конец очереди
 
             logger.debug(
-                f"Visited page: {node} at {datetime.datetime.now()}")  # выводим информацию о посещенной странице
+                f"Visited page: {node} at {datetime.datetime.now().strftime('%H:%M:%S')}")  # выводим информацию о посещенной странице
 
-    pool.close()  # закрываем пул процессов
-    pool.join()  # ждем завершения всех процессов
     return None  # если путь не найден, возвращаем None
 
 
-start = "https://ru.wikipedia.org/wiki/Xbox_360_S"
-end = "https://ru.wikipedia.org/wiki/Nintendo_3DS"
+async def main():
+    start = "https://ru.wikipedia.org/wiki/Xbox_360_S"
+    end = "https://ru.wikipedia.org/wiki/Nintendo_3DS"
 
-starttime = datetime.datetime.now()
-print(f'Запущено в {datetime.datetime.now().strftime("%H:%M:%S")}')
+    starttime = datetime.datetime.now()
+    print(f'Запущено в {datetime.datetime.now().strftime("%H:%M:%S")}')
+    loop = asyncio.get_running_loop()
+    path = await bfs(start, end)
+    print(path)
+    print(f'Завершено в {datetime.datetime.now().strftime("%H:%M:%S")}')
+    print(f'Потрачено минут на обработку: {(datetime.datetime.now() - starttime) // 60}')
 
-# Рабочее время ~10 минут и 900 пройденных ссылок
-path = bfs(start, end)
-print(path)
-print(f'Завершено в {datetime.datetime.now().strftime("%H:%M:%S")}')
-print(f'Потрачено минут на обработку: {(datetime.datetime.now() - starttime) // 60}')
-
+asyncio.run(main())
