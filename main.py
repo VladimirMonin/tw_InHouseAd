@@ -1,5 +1,7 @@
 import asyncio
 import re
+
+from lxml import html
 import aiohttp
 import multiprocessing
 import datetime
@@ -20,7 +22,6 @@ file_handler.setFormatter(formatter)
 # Добавление обработчика в логгер
 logger.addHandler(file_handler)
 
-
 async def get_links_async(url):
     """Получение списка ссылок на странице"""
     try:
@@ -29,8 +30,7 @@ async def get_links_async(url):
                 text = await response.text()
                 # Поиск ссылок на странице с помощью регулярного выражения
                 links = re.findall(r'<a\s+(?:[^>]*?\s+)?href=(["\'])(.*?)\1', text)
-                links = [link[1] for link in links if
-                         link[1].startswith('/wiki/') and not link[1].startswith('/wiki/Special:')]
+                links = [link[1] for link in links if link[1].startswith('/wiki/') and not link[1].startswith('/wiki/Special:')]
                 links = ['https://ru.wikipedia.org' + link for link in links]
                 return links
     except aiohttp.ClientError as e:
@@ -49,7 +49,7 @@ def bfs(start, end):
     visited = set()  # создаем множество посещенных страниц
     lock = multiprocessing.Lock()  # создаем блокировку для безопасности многопоточности
 
-    pool = multiprocessing.Pool(16)  # создаем пул процессов
+    pool = multiprocessing.Pool()  # создаем пул процессов
 
     while queue:
         path = queue.pop(0)  # извлекаем первый путь из очереди
@@ -71,7 +71,7 @@ def bfs(start, end):
             queue.extend(new_paths)  # добавляем расширенные пути в конец очереди
 
             logger.debug(
-                f"Visited page: {node}")  # выводим информацию о посещенной странице
+                f"Visited page: {node} at {datetime.datetime.now()}")  # выводим информацию о посещенной странице
 
     pool.close()  # закрываем пул процессов
     pool.join()  # ждем завершения всех процессов
@@ -85,4 +85,4 @@ starttime = datetime.datetime.now()
 path = bfs(start, end)
 print(path)
 print(f'Потрачено минут на обработку: {(datetime.datetime.now() - starttime) // 60}')
-# Рабочее время 10 минут
+# Рабочее время 12 минут
