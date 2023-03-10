@@ -91,7 +91,7 @@ def print_paragraph_with_link(path):
 
 async def main():
     start = "https://ru.wikipedia.org/wiki/Xbox_360_S"
-    end = "https://ru.wikipedia.org/wiki/Kinect"
+    end = "https://ru.wikipedia.org/wiki/Nintendo_3DS"
 
     print(f'Запущено в {datetime.datetime.now().strftime("%H:%M:%S")}')
     loop = asyncio.get_running_loop()
