@@ -1,3 +1,4 @@
+from multiprocessing import Lock, Process, Queue, Manager
 import wikipediaapi
 import datetime
 import logging
@@ -18,6 +19,12 @@ file_handler.setFormatter(formatter)
 logger.addHandler(file_handler)
 
 
+
+
+# Создание объекта блокировки
+lock = Lock()
+
+# Создание экземпляра Wikipedia API
 wiki = wikipediaapi.Wikipedia('ru')
 
 
@@ -29,32 +36,58 @@ def get_links(title):
     return {title: [link for link in links]}
 
 
-def bfs(start_title, end_title):
-    start_links = get_links(start_title)
+def bfs_worker(start_title, end_title, visited, result_queue):
+    # Создание пустой очереди
+    queue = Queue()
+    # Помещение стартового заголовка в очередь
+    queue.put(([start_title], start_title))
 
-    visited = set()
-    queue = [(start_links, [start_title])]
+    while not queue.empty():
+        # Извлечение следующего пути и последнего заголовка из очереди
+        path, last_title = queue.get()
 
-    while queue:
-        (links, path) = queue.pop(0)
-        last_title = path[-1]
-
-        if last_title in visited:
-            continue
-        visited.add(last_title)
+        # Использование блокировки для синхронизации доступа к общей переменной visited
+        with visited.get_lock():
+            if last_title in visited:
+                continue
+            visited.add(last_title)
 
         if last_title == end_title:
-            return path
+            # Если достигнут конечный заголовок, помещаем путь в очередь результатов
+            result_queue.put(path)
+            break
+
+        links = get_links(last_title)
+        if links is None:
+            continue
 
         for link_title in links[last_title]:
             if link_title not in visited:
-                new_links = links.copy()
-                link_links = get_links(link_title)
-                if link_links is not None:
-                    new_links[last_title] += link_links
-                    new_path = path + [link_title]
-                    queue.append((new_links, new_path))
-                    logger.debug(f'Processed page: {link_title}')
+                new_path = path + [link_title]
+                queue.put((new_path, link_title))
+
+
+def bfs(start_title, end_title, num_processes=10):
+    # Создание множества, в которое будут добавляться уже посещенные страницы
+    visited = Manager().list()
+
+    # Создание очереди результатов
+    result_queue = Queue()
+
+    # Создание списка процессов
+    processes = []
+    for i in range(num_processes):
+        p = Process(target=bfs_worker, args=(start_title, end_title, visited, result_queue))
+        p.start()
+        processes.append(p)
+
+    # Ожидание завершения всех процессов
+    for p in processes:
+        p.join()
+
+    # Извлечение первого найденного пути из очереди результатов
+    if not result_queue.empty():
+        return result_queue.get()
 
     return None
 

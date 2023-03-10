@@ -22,6 +22,7 @@ file_handler.setFormatter(formatter)
 # Добавление обработчика в логгер
 logger.addHandler(file_handler)
 
+
 async def get_links_async(url):
     """Получение списка ссылок на странице"""
     try:
@@ -30,7 +31,8 @@ async def get_links_async(url):
                 text = await response.text()
                 # Поиск ссылок на странице с помощью регулярного выражения
                 links = re.findall(r'<a\s+(?:[^>]*?\s+)?href=(["\'])(.*?)\1', text)
-                links = [link[1] for link in links if link[1].startswith('/wiki/') and not link[1].startswith('/wiki/Special:')]
+                links = [link[1] for link in links if
+                         link[1].startswith('/wiki/') and not link[1].startswith('/wiki/Special:')]
                 links = ['https://ru.wikipedia.org' + link for link in links]
                 return links
     except aiohttp.ClientError as e:
@@ -82,7 +84,11 @@ start = "https://ru.wikipedia.org/wiki/Xbox_360_S"
 end = "https://ru.wikipedia.org/wiki/Nintendo_3DS"
 
 starttime = datetime.datetime.now()
+print(f'Запущено в {datetime.datetime.now().strftime("%H:%M:%S")}')
+
+# Рабочее время ~10 минут и 900 пройденных ссылок
 path = bfs(start, end)
 print(path)
+print(f'Завершено в {datetime.datetime.now().strftime("%H:%M:%S")}')
 print(f'Потрачено минут на обработку: {(datetime.datetime.now() - starttime) // 60}')
-# Рабочее время 12 минут
+
