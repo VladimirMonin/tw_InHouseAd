@@ -39,15 +39,30 @@ async def get_links_async(url):
         return []
 
 
-def extend_path(path, link):
-    """Добавляет новую ссылку в конец пути"""
-    return path + [link]
-
-
 async def bfs(start, end):
     """Поиск в ширину от start до end на википедии"""
-    queue = [[start]]  # создаем очередь путей, начинаем с пути из стартовой страницы
     visited = set()  # создаем множество посещенных страниц
+
+    async def get_links_and_extend_path(path):
+        """Получение списка ссылок на странице и расширение текущих путей"""
+        node = path[-1]  # получаем последнюю страницу в пути
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(node) as response:
+                    text = await response.text()
+                    # Поиск ссылок на странице с помощью регулярного выражения
+                    links = re.findall(r'<a\s+(?:[^>]*?\s+)?href=(["\'])(.*?)\1', text)
+                    links = [link[1] for link in links if
+                             link[1].startswith('/wiki/') and not link[1].startswith('/wiki/Special:')]
+                    links = ['https://ru.wikipedia.org' + link for link in links]
+                    # расширяем текущие пути новыми ссылками
+                    new_paths = [path + [link] for link in links]
+                    return new_paths
+        except aiohttp.ClientError as e:
+            logger.error(f"Error getting links from {node}: {str(e)}")
+            return []
+
+    queue = [[start]]  # создаем очередь путей, начинаем с пути из стартовой страницы
 
     while queue:
         path = queue.pop(0)  # извлекаем первый путь из очереди
@@ -59,8 +74,8 @@ async def bfs(start, end):
         elif node not in visited:  # если страница не была посещена
             visited.add(node)  # добавляем страницу в посещенные
 
-            links = await asyncio.create_task(get_links_async(node))  # получаем список ссылок со страницы
-            new_paths = [extend_path(path, link) for link in links]  # расширяем текущие пути новыми ссылками
+            # получаем список ссылок со страницы и расширяем текущие пути
+            new_paths = await asyncio.create_task(get_links_and_extend_path(path))
 
             queue.extend(new_paths)  # добавляем расширенные пути в конец очереди
 
@@ -94,7 +109,7 @@ async def main():
     end = input("Введите ссылку...\nНапример https://ru.wikipedia.org/wiki/Nintendo_3DS. :")
 
     print(f'Запущено в {datetime.datetime.now().strftime("%H:%M:%S")}')
-    loop = asyncio.get_running_loop()
+    asyncio.get_running_loop()
     path = await bfs(start, end)
     print_paragraph_with_link(path)
     print(f'Завершено в {datetime.datetime.now().strftime("%H:%M:%S")}')
